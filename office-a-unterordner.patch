@@ -1,0 +1,54 @@
+diff --git a/index.ts b/index.ts
+index 135c32f..420550f 100644
+--- a/index.ts
++++ b/index.ts
+@@ -213,7 +213,7 @@ void (async () => {
+ 
+   // `?saved=` on its own and nothing stored under it: the document it names was
+   // deleted or has expired, so there is nothing here to show.
+-  if (savedParam && !isEmbedded) window.location.replace('/');
++  if (savedParam && !isEmbedded) window.location.replace('./'); // KXD: im Unterordner bleiben
+ })();
+ 
+ // No boot-time recovery offer here on purpose. /editor never opens empty (a
+diff --git a/lib/offline-worker-control.ts b/lib/offline-worker-control.ts
+index 389a97a..ae5fbf5 100644
+--- a/lib/offline-worker-control.ts
++++ b/lib/offline-worker-control.ts
+@@ -1,6 +1,10 @@
++/** KXD: Adresse des gebauten Moduls (assets/…) – daraus ergibt sich der App-Ordner. */
++const MODUL_URL_OWC = import.meta.url;
+ /** The page chooses the response policy; a Service Worker itself is not isolated. */
+ export function appWorkerScriptURL(href = location.href, isolated = globalThis.crossOriginIsolated === true): string {
+-  const url = new URL('/sw.js', href);
++  // KXD: Offline-Speicher im eigenen Unterordner (neben index.html), nie an der Wurzel der Adresse,
++  // sonst wuerde er auch Heft, Glas und Organizer unter derselben Adresse erfassen.
++  const url = new URL('../sw.js', MODUL_URL_OWC);
+   if (isolated) url.searchParams.set('isolation', '1');
+   return url.href;
+ }
+@@ -25,7 +29,7 @@ export async function resolveAppWorkerScriptURL(
+   const controller = new AbortController();
+   const timer = setTimeout(() => controller.abort(), 1500);
+   try {
+-    const target = new URL('/editor', href);
++    const target = new URL('../editor.html', MODUL_URL_OWC);
+     const response = await request(target.href, { method: 'HEAD', cache: 'no-store', signal: controller.signal });
+     const sameOrigin = !response.url || new URL(response.url).origin === target.origin;
+     return response.ok &&
+diff --git a/lib/onlyoffice/guards/x2t-worker.ts b/lib/onlyoffice/guards/x2t-worker.ts
+index b95e2ad..501e281 100644
+--- a/lib/onlyoffice/guards/x2t-worker.ts
++++ b/lib/onlyoffice/guards/x2t-worker.ts
+@@ -44,7 +44,10 @@ import { waitForFontSystem, type FontSystemWindow } from '../font-system';
+ /** How long an idle worker is kept before its heap is handed back. */
+ const IDLE_TERMINATE_MS = 30_000;
+ 
+-const WORKER_URL = '/sdkjs/common/wasm/x2t/x2t.worker.js';
++// KXD: relativ zum gebauten Modul (assets/), damit die App im Unterordner /office/ laeuft.
++// Ueber eine Variable, damit Vite den Pfad nicht beim Bauen aufzuloesen versucht.
++const MODUL_URL = import.meta.url;
++const WORKER_URL = new URL('../sdkjs/common/wasm/x2t/x2t.worker.js', MODUL_URL).href;
+ 
+ /** Style suffixes the vendor's own fetchFonts uses, keyed by the info field. */
+ const FONT_STYLE_SUFFIX: Record<string, string> = {

@@ -14,6 +14,10 @@ Quellcode: der unveränderte Bau von ranuts/document (Commit e975654679d2cc3ef61
 - `icons/document*` – eigenes Icon statt des ursprünglichen
 - `manifest.json` – eigener App-Name
 - `sdkjs/common/wasm/x2t/x2t.wasm.br` – unverändert, nur entpackt (GitHub Pages kann keine Brotli-Kopfzeile senden)
+- `sw.js` – eigener, einfacher Offline-Speicher nur für diesen Unterordner (der ursprüngliche hängt fest an der Wurzel der Adresse)
+- `assets/` – gebaut aus ranuts/document mit drei kleinen Änderungen für den Betrieb im Unterordner /office/
+  (Pfad des Umwandlungs-Bausteins, Adresse des Offline-Speichers, eine Weiterleitung). Die Änderungen stehen als
+  Patch in der Datei `office-a-unterordner.patch`.
 
 ONLYOFFICE ist eine Marke von Ascensio System SIA. Dieses Projekt ist kein offizielles
 ONLYOFFICE-Produkt und steht in keiner Verbindung dazu. Microsoft, Word, Excel und PowerPoint

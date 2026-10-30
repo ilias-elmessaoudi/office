@@ -57,8 +57,8 @@
       "_dom-Fv1-TPP9.js"
     ]
   },
-  "_document-B1eewHwZ.js": {
-    "file": "assets/document-B1eewHwZ.js",
+  "_document-CBziYi1U.js": {
+    "file": "assets/document-CBziYi1U.js",
     "name": "document",
     "imports": [
       "_utils-CwYt1meC-CK5SVuVq.js",
@@ -257,13 +257,13 @@
     ]
   },
   "editor.html": {
-    "file": "assets/editor-DiAlXAri.js",
+    "file": "assets/editor-D5AC10Ti.js",
     "name": "editor",
     "src": "editor.html",
     "isEntry": true,
     "imports": [
       "_modulepreload-polyfill-P2Xu9kJm.js",
-      "_document-B1eewHwZ.js",
+      "_document-CBziYi1U.js",
       "_utils-CwYt1meC-CK5SVuVq.js",
       "_component-DkBrsfH0-CiYcmBjh.js",
       "_preferences-BPtpnNDu.js",
@@ -370,12 +370,12 @@
     ]
   },
   "lib/history/recovery.ts": {
-    "file": "assets/recovery-Wh8xZtbc.js",
+    "file": "assets/recovery-DQ_n2-qM.js",
     "name": "recovery",
     "src": "lib/history/recovery.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_document-B1eewHwZ.js",
+      "_document-CBziYi1U.js",
       "_preferences-BPtpnNDu.js"
     ]
   },
