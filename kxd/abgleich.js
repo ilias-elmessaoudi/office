@@ -89,7 +89,8 @@ const Abgleich = (() => {
         if (lokal && lokal.geaendert === z.geaendert) continue;          // schon aktuell
         const { data: blob, error: e2 } = await client.storage.from(EIMER).download(pfad(z.id));
         if (e2) throw new Error('Datei laden: ' + e2.message);
-        await Speicher.uebernehmen({ id: z.id, name: z.daten.name, art: z.daten.art, datei: blob, geaendert: z.geaendert, hochgeladen: z.geaendert });
+        // Griff auf eine lokale Originaldatei (Öffnen mit) bleibt erhalten
+        await Speicher.uebernehmen({ ...(lokal || {}), id: z.id, name: z.daten.name, art: z.daten.art, datei: blob, geaendert: z.geaendert, hochgeladen: z.geaendert });
         etwasNeu = true;
         dispatchEvent(new CustomEvent('kxd-fern', { detail: { id: z.id } }));
       }

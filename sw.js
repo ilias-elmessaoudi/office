@@ -3,7 +3,7 @@
 // Editor-Dateien (sdkjs, web-apps, fonts) liegen in einem Zwischenspeicher, der nur bei neuem Editor-Kern
 // wechselt; alles andere in einem, der bei jeder Veroeffentlichung wechselt. Beide Namen setzt office-a-paket.py.
 const KERN = 'kxd-office-kern-e975654';
-const APP = 'kxd-office-app-20261030224729';
+const APP = 'kxd-office-app-20261101131447';
 const BASIS = new URL('./', self.location.href).pathname;          // z. B. /office/
 const GRUNDAUSSTATTUNG = ['./', 'index.html', 'editor.html', 'manifest.json', 'kxd/app.js', 'kxd/app.css',
   'kxd/speicher.js', 'kxd/abgleich.js', 'kxd/vendor/supabase.min.js', 'kxd/icon.svg', 'kxd/icon-192.png',

@@ -15,6 +15,8 @@ const artVon = (name) => {
 };
 // Alte/fremde Formate werden beim Speichern ins passende Office-Format umgewandelt.
 const zielEndung = (art) => (art === 'pdf' ? 'pdf' : art);
+// In den Einzel-Apps (text/, tabelle/, folien/) gesetzt: zeigt nur diese Art. In der Gesamt-App leer.
+const NUR_ART = window.KXD_ART || null;
 
 let aktuell = null;          // { id, name, art }
 let editorBereit = null;     // Promise, erfuellt bei document:ready
@@ -36,7 +38,7 @@ function datum(ms) {
 // ---------- Uebersicht ----------
 async function liste() {
   const filter = $('#suche').value.trim().toLowerCase();
-  const alle = (await Speicher.alle()).filter((e) => e.name.toLowerCase().includes(filter));
+  const alle = (await Speicher.alle()).filter((e) => e.name.toLowerCase().includes(filter) && (!NUR_ART || e.art === NUR_ART));
   const ziel = $('#liste');
   ziel.replaceChildren();
   $('#leer').hidden = alle.length > 0 || !!filter;
@@ -70,6 +72,47 @@ async function dateienAufnehmen(dateien) {
     await Speicher.sichern({ id: letzte, name: f.name, art: artVon(f.name), datei: f });
   }
   if (dateien.length === 1) bearbeiten(letzte); else liste();
+}
+
+// Über Windows „Öffnen mit“ (installierte App) übergebene Dateien. Der Griff auf die Datei wird gemerkt,
+// damit „Speichern“ wie in Word zurück in die Originaldatei schreibt (z. B. im Download-Ordner).
+async function griffeAufnehmen(griffe) {
+  let letzte;
+  const alle = await Speicher.alle();
+  for (const griff of griffe) {
+    const f = await griff.getFile();
+    let vorhanden = null;
+    for (const e of alle) if (e.griff && (await e.griff.isSameEntry(griff).catch(() => false))) { vorhanden = e; break; }
+    if (vorhanden) {
+      letzte = vorhanden.id;
+      // Datei wurde außerhalb geändert (z. B. in Word)? Dann deren Stand übernehmen.
+      if (f.lastModified > (vorhanden.dateiStand || 0)) await Speicher.sichern({ ...vorhanden, datei: f, dateiStand: f.lastModified, griff });
+    } else {
+      letzte = crypto.randomUUID();
+      await Speicher.sichern({ id: letzte, name: f.name, art: artVon(f.name), datei: f, griff, dateiStand: f.lastModified });
+    }
+  }
+  if (griffe.length === 1) bearbeiten(letzte); else liste();
+}
+if ('launchQueue' in window) {
+  launchQueue.setConsumer((start) => { if (start.files?.length) griffeAufnehmen(start.files); });
+}
+
+// Zurück in die Originaldatei schreiben – nur wenn das Format gleich bleibt (aus .doc wird kein .doc).
+async function inOriginalSchreiben(e, nachfragen) {
+  const griff = e?.griff;
+  if (!griff || !griff.name.toLowerCase().endsWith('.' + zielEndung(e.art))) return false;
+  let recht = await griff.queryPermission({ mode: 'readwrite' });
+  if (recht === 'prompt' && nachfragen) recht = await griff.requestPermission({ mode: 'readwrite' });
+  if (recht !== 'granted') { $('#original').hidden = false; return false; }
+  const ziel = await griff.createWritable();
+  await ziel.write(e.datei);
+  await ziel.close();
+  const stand = (await griff.getFile()).lastModified;
+  const jetzt = await Speicher.holen(e.id);
+  if (jetzt) await Speicher.uebernehmen({ ...jetzt, dateiStand: stand });
+  $('#original').hidden = true;
+  return true;
 }
 
 // ---------- Editor (iframe) ----------
@@ -109,8 +152,10 @@ async function speichern() {
     const p = await befehl('document:save', { targetExt: zielEndung(aktuell.art).toUpperCase() });
     const name = aktuell.name.replace(/\.[^.]+$/, '') + '.' + zielEndung(aktuell.art);
     if (name !== aktuell.name) { aktuell.name = name; $('#name').value = name; }
-    await Speicher.sichern({ ...aktuell, datei: p.file });
-    status(p.dirty ? 'Nicht gespeichert' : 'Gespeichert');
+    const vorher = await Speicher.holen(aktuell.id);
+    await Speicher.sichern({ ...vorher, name: aktuell.name, datei: p.file });
+    const inDatei = await inOriginalSchreiben(await Speicher.holen(aktuell.id), false).catch(() => false);
+    status(p.dirty ? 'Nicht gespeichert' : inDatei ? 'In Datei gespeichert' : 'Gespeichert');
     if (p.dirty) planeSpeichern();
   } catch (err) {
     status('Speichern fehlgeschlagen');
@@ -122,6 +167,7 @@ async function bearbeiten(id) {
   const e = await Speicher.holen(id);
   if (!e) return;
   aktuell = { id: e.id, name: e.name, art: e.art };
+  $('#original').hidden = true;
   $('#start').hidden = true; $('#bearbeiten').hidden = false;
   $('#name').value = e.name;
   document.title = e.name + ' – ' + (ARTEN[e.art]?.name || 'KXD Office A');
@@ -129,7 +175,7 @@ async function bearbeiten(id) {
   editorBereit = (() => { let los; const p = new Promise((r) => (los = r)); p.los = los; return p; })();
   const rahmen = $('#editor');
   rahmen.src = 'editor.html?embed=1&locale=de-DE';
-  if (history.state?.id !== id) history.pushState({ id }, '', '#' + id);
+  if (history.state?.id !== id) history.pushState({ id }, '', location.pathname + '#' + id);
   // „document:ready“ kommt manchmal, bevor wir lauschen – darum nachfragen, bis der Editor antwortet.
   rahmen.onload = () => {
     const frage = setInterval(() => {
@@ -148,7 +194,7 @@ async function schliessen() {
   aktuell = null; ungespeichert = false;
   $('#editor').src = 'about:blank';
   $('#bearbeiten').hidden = true; $('#start').hidden = false;
-  document.title = 'KXD Office A';
+  document.title = NUR_ART ? ARTEN[NUR_ART].name : 'KXD Office A';
   liste();
 }
 
@@ -161,13 +207,20 @@ async function herunterladen(ext) {
     a.download = aktuell.name.replace(/\.[^.]+$/, '') + '.' + ext;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    if (ext !== 'pdf' && !p.dirty) { await Speicher.sichern({ ...aktuell, datei: p.file }); }
+    if (ext !== 'pdf' && !p.dirty) { await Speicher.sichern({ ...(await Speicher.holen(aktuell.id)), datei: p.file }); }
     status('Gespeichert');
   } catch (err) { meldung('Fehlgeschlagen: ' + err.message, 5000); status(''); }
 }
 
 // ---------- Bedienung ----------
-document.querySelectorAll('[data-neu]').forEach((k) => (k.onclick = () => neu(k.dataset.neu)));
+document.querySelectorAll('[data-neu]').forEach((k) => {
+  k.onclick = () => neu(k.dataset.neu);
+  if (NUR_ART && k.dataset.neu !== NUR_ART) k.hidden = true;
+});
+$('#original').onclick = async () => {
+  try { if (await inOriginalSchreiben(await Speicher.holen(aktuell.id), true)) { status('In Datei gespeichert'); meldung('In der Originaldatei gespeichert'); } }
+  catch (err) { meldung('Konnte nicht in die Datei schreiben: ' + err.message, 5000); }
+};
 $('#oeffnen-knopf').onclick = () => $('#datei').click();
 $('#datei').onchange = (e) => { dateienAufnehmen([...e.target.files]); e.target.value = ''; };
 $('#suche').oninput = liste;

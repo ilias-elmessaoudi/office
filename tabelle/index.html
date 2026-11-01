@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- erzeugt von werkzeuge/einzel-apps.py – nicht von Hand bearbeiten -->
+<html lang="de">
+<head>
+  <base href="../">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14111c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="KXD Tabelle">
+  <link rel="icon" href="tabelle/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="tabelle/icon-180.png">
+  <link rel="manifest" href="tabelle/manifest.webmanifest">
+  <title>KXD Tabelle</title>
+  <link rel="stylesheet" href="kxd/app.css">
+</head>
+<body>
+  <!-- ============ Startseite ============ -->
+  <section id="start" class="ansicht">
+    <header class="kopf">
+      <div class="marke"><img src="tabelle/icon.svg" alt=""><span>KXD Tabelle</span></div>
+      <button class="knopf wolke" id="wolke" title="Abgleich mit dem Heft-Konto">☁ Anmelden</button>
+      <button class="knopf" id="oeffnen-knopf" title="Datei öffnen (Strg+O)">Datei öffnen</button>
+      <input type="file" id="datei" accept=".docx,.doc,.odt,.rtf,.txt,.xlsx,.xls,.ods,.csv,.pptx,.ppt,.odp,.pdf" hidden multiple>
+    </header>
+    <main>
+      <h2>Neu</h2>
+      <div class="neu">
+        <button data-neu="docx" class="kachel text"><span class="symbol">T</span><span>KXD Text</span><small>Leeres Dokument</small></button>
+        <button data-neu="xlsx" class="kachel tabelle"><span class="symbol">#</span><span>KXD Tabelle</span><small>Leere Tabelle</small></button>
+        <button data-neu="pptx" class="kachel folien"><span class="symbol">▶</span><span>KXD Folien</span><small>Leere Präsentation</small></button>
+      </div>
+      <div class="liste-kopf">
+        <h2>Zuletzt</h2>
+        <input type="search" id="suche" placeholder="Suchen">
+      </div>
+      <div id="liste" class="liste"></div>
+      <p id="leer" class="leer" hidden>Noch keine Dokumente. Lege oben ein neues an, öffne eine Datei oder zieh sie hier hinein.</p>
+    </main>
+  </section>
+
+  <!-- ============ Editor ============ -->
+  <section id="bearbeiten" class="ansicht" hidden>
+    <header class="ed-kopf">
+      <button class="knopf flach" id="zurueck" title="Zurück zur Übersicht">‹ Übersicht</button>
+      <input id="name" class="name" spellcheck="false" title="Dateiname">
+      <span id="status" class="status"></span>
+      <div class="rechts">
+        <button class="knopf flach" id="original" hidden title="Änderungen zurück in die geöffnete Datei schreiben (einmal erlauben)">In Datei speichern</button>
+        <button class="knopf flach" id="herunterladen" title="Als Office-Datei herunterladen">Herunterladen</button>
+        <button class="knopf flach" id="als-pdf" title="Als PDF herunterladen">PDF</button>
+      </div>
+    </header>
+    <iframe id="editor" title="Editor" allow="clipboard-read; clipboard-write"></iframe>
+  </section>
+
+  <dialog id="anmeldung" class="anmeldung">
+    <form method="dialog" id="anmelde-form">
+      <h3>Abgleich zwischen Geräten</h3>
+      <p class="leise" id="anmelde-text">Mit deinem Heft-Konto anmelden. Dann sind deine Dokumente auf PC, Laptop und iPad gleich.</p>
+      <div id="anmelde-felder">
+        <input type="email" id="mail" placeholder="E-Mail" autocomplete="username">
+        <input type="password" id="passwort" placeholder="Passwort" autocomplete="current-password">
+      </div>
+      <p class="fehler" id="anmelde-fehler" hidden></p>
+      <div class="knoepfe">
+        <button value="abbrechen" class="knopf">Schließen</button>
+        <button id="anmelde-los" value="los" class="knopf voll">Anmelden</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="meldung" class="meldung" hidden></div>
+  <script src="kxd/vendor/supabase.min.js"></script>
+  <script>window.KXD_ART = "xlsx";</script>
+  <script src="kxd/speicher.js"></script>
+  <script src="kxd/abgleich.js"></script>
+  <script src="kxd/app.js"></script>
+</body>
+</html>
