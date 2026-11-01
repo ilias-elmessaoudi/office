@@ -98,8 +98,45 @@ if ('launchQueue' in window) {
   launchQueue.setConsumer((start) => { if (start.files?.length) griffeAufnehmen(start.files); });
 }
 
+// Über die KXD-Brücke (Windows „Öffnen mit“, siehe projekte/office/kxd-oeffnen) übergebene Datei:
+// ?lokal=<Kennung> – die Brücke auf diesem PC liefert die Datei und nimmt Gespeichertes zurück.
+const BRUECKE = 'http://127.0.0.1:47321/datei/';
+async function brueckeAufnehmen(kennung) {
+  const r = await fetch(BRUECKE + kennung, { targetAddressSpace: 'loopback' });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).fehler || 'Brücke antwortet nicht');
+  const name = decodeURIComponent(r.headers.get('X-Dateiname'));
+  const pfad = decodeURIComponent(r.headers.get('X-Pfad'));
+  const stand = +r.headers.get('X-Geaendert');
+  const datei = await r.blob();
+  const vorhanden = (await Speicher.alle()).find((e) => e.lokal?.pfad === pfad);
+  let id;
+  if (vorhanden) {
+    id = vorhanden.id;
+    const neu = { ...vorhanden, lokal: { kennung, pfad } };
+    // Datei wurde außerhalb geändert (z. B. in Word)? Dann deren Stand übernehmen.
+    if (stand > (vorhanden.dateiStand || 0)) Object.assign(neu, { datei, dateiStand: stand });
+    await Speicher.sichern(neu);
+  } else {
+    id = crypto.randomUUID();
+    await Speicher.sichern({ id, name, art: artVon(name), datei, lokal: { kennung, pfad }, dateiStand: stand });
+  }
+  history.replaceState(null, '', location.pathname);
+  bearbeiten(id);
+}
+
 // Zurück in die Originaldatei schreiben – nur wenn das Format gleich bleibt (aus .doc wird kein .doc).
 async function inOriginalSchreiben(e, nachfragen) {
+  if (e?.lokal) {
+    if (!e.lokal.pfad.toLowerCase().endsWith('.' + zielEndung(e.art))) return false;
+    const r = await fetch(BRUECKE + e.lokal.kennung, { method: 'PUT', body: e.datei, targetAddressSpace: 'loopback' });
+    if (!r.ok) {
+      meldung('In die Originaldatei konnte nicht gespeichert werden (Datei bitte erneut über „Öffnen mit“ öffnen). In KXD Office ist alles gespeichert.', 7000);
+      return false;
+    }
+    const jetzt = await Speicher.holen(e.id);
+    if (jetzt) await Speicher.uebernehmen({ ...jetzt, dateiStand: (await r.json()).geaendert });
+    return true;
+  }
   const griff = e?.griff;
   if (!griff || !griff.name.toLowerCase().endsWith('.' + zielEndung(e.art))) return false;
   let recht = await griff.queryPermission({ mode: 'readwrite' });
@@ -282,5 +319,7 @@ $('#anmelde-form').addEventListener('submit', async (e) => {
 if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Offline-Speicher', e)));
 Abgleich.starten().catch((e) => console.warn('Abgleich nicht verfügbar', e));
 
-const start = location.hash.slice(1);
+const lokal = new URLSearchParams(location.search).get('lokal');
+if (lokal) brueckeAufnehmen(lokal).catch((e) => { meldung('Datei konnte nicht geladen werden: ' + e.message, 8000); liste(); });
+const start = lokal ? '' : location.hash.slice(1);
 start ? Speicher.holen(start).then((e) => (e ? bearbeiten(start) : liste())) : liste();
