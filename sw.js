@@ -3,14 +3,15 @@
 // Editor-Dateien (sdkjs, web-apps, fonts) liegen in einem Zwischenspeicher, der nur bei neuem Editor-Kern
 // wechselt; alles andere in einem, der bei jeder Veroeffentlichung wechselt. Beide Namen setzt office-a-paket.py.
 const KERN = 'kxd-office-kern-e975654';
-const APP = 'kxd-office-app-20261101132437';
+const APP = 'kxd-office-app-20261101132655';
 const BASIS = new URL('./', self.location.href).pathname;          // z. B. /office/
 const GRUNDAUSSTATTUNG = ['./', 'index.html', 'editor.html', 'manifest.json', 'kxd/app.js', 'kxd/app.css',
   'kxd/speicher.js', 'kxd/abgleich.js', 'kxd/vendor/supabase.min.js', 'kxd/icon.svg', 'kxd/icon-192.png',
   'kxd/vorlagen/leer.docx', 'kxd/vorlagen/leer.xlsx', 'kxd/vorlagen/leer.pptx'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(APP).then((c) => c.addAll(GRUNDAUSSTATTUNG)).then(() => self.skipWaiting()));
+  // cache: 'reload' – am Browser-Zwischenspeicher vorbei, sonst landet eine veraltete Fassung im Offline-Speicher
+  e.waitUntil(caches.open(APP).then((c) => c.addAll(GRUNDAUSSTATTUNG.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
@@ -29,17 +30,15 @@ self.addEventListener('fetch', (e) => {
   // Rechtschreib-Baustein nicht abfangen: haengt sonst beim allerersten Start (Erfahrung des Upstream-Projekts)
   if (url.pathname.includes('/sdkjs/common/spell/')) return;
   const pfad = url.pathname.slice(BASIS.length);
-  const seite = anfrage.mode === 'navigate' || pfad === '' || pfad.endsWith('.html');
-
-  if (seite) {
-    // Seiten: erst Netz (immer neueste Fassung), ohne Netz aus dem Speicher
-    e.respondWith(fetch(anfrage).then((antwort) => {
+  if (!istKern(pfad)) {
+    // Seiten und eigene Dateien (klein): erst Netz, neueste Fassung, ohne Netz aus dem Speicher
+    e.respondWith(fetch(anfrage, { cache: 'no-cache' }).then((antwort) => {
       if (antwort.ok) { const kopie = antwort.clone(); caches.open(APP).then((c) => c.put(anfrage, kopie)); }
       return antwort;
     }).catch(() => caches.match(anfrage, { ignoreSearch: true }).then((r) => r || caches.match(BASIS + 'index.html'))));
     return;
   }
-  // Alles andere: erst Speicher, sonst Netz und merken
+  // Editor-Kern (gross, aendert sich selten): erst Speicher, sonst Netz und merken
   e.respondWith(caches.match(anfrage, { ignoreSearch: true }).then((r) => r || fetch(anfrage).then((antwort) => {
     if (antwort.ok && antwort.type === 'basic') {
       const kopie = antwort.clone();
