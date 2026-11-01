@@ -99,10 +99,10 @@ if ('launchQueue' in window) {
 }
 
 // Über die KXD-Brücke (Windows „Öffnen mit“, siehe projekte/office/kxd-oeffnen) übergebene Datei:
-// ?lokal=<Kennung> – die Brücke auf diesem PC liefert die Datei und nimmt Gespeichertes zurück.
-const BRUECKE = 'http://127.0.0.1:47321/datei/';
+// ?lokal=<Kennung> – die Brücke auf diesem PC liefert App und Datei aus und nimmt Gespeichertes zurück.
+const BRUECKE = '/datei/';
 async function brueckeAufnehmen(kennung) {
-  const r = await fetch(BRUECKE + kennung, { targetAddressSpace: 'loopback' });
+  const r = await fetch(BRUECKE + kennung);
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).fehler || 'Brücke antwortet nicht');
   const name = decodeURIComponent(r.headers.get('X-Dateiname'));
   const pfad = decodeURIComponent(r.headers.get('X-Pfad'));
@@ -128,9 +128,10 @@ async function brueckeAufnehmen(kennung) {
 async function inOriginalSchreiben(e, nachfragen) {
   if (e?.lokal) {
     if (!e.lokal.pfad.toLowerCase().endsWith('.' + zielEndung(e.art))) return false;
-    const r = await fetch(BRUECKE + e.lokal.kennung, { method: 'PUT', body: e.datei, targetAddressSpace: 'loopback' });
-    if (!r.ok) {
-      meldung('In die Originaldatei konnte nicht gespeichert werden (Datei bitte erneut über „Öffnen mit“ öffnen). In KXD Office ist alles gespeichert.', 7000);
+    const r = await fetch(BRUECKE + e.lokal.kennung, { method: 'PUT', body: e.datei }).catch(() => null);
+    if (!r?.ok) {
+      const grund = r?.status === 423 ? 'Die Datei ist gerade in einem anderen Programm geöffnet.' : 'Bitte die Datei erneut über „Öffnen mit“ öffnen.';
+      meldung(`In die Originaldatei konnte nicht gespeichert werden. ${grund} In KXD Office ist alles gespeichert.`, 7000);
       return false;
     }
     const jetzt = await Speicher.holen(e.id);
