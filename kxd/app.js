@@ -177,10 +177,49 @@ addEventListener('message', (e) => {
 });
 
 function status(t) { $('#status').textContent = t; }
+
+// ---------- Nie mitten in die Arbeit speichern ----------
+// Gespeichert wird erst nach RUHE ms ohne Tippen/Klicken/Ziehen, nie während eine Zelle bearbeitet wird,
+// eine Maustaste gedrückt ist (Ziehen, Markieren) oder der Editor selbst noch beschäftigt ist.
+const RUHE = 4000;
+let letzteEingabe = 0, tasteGedrueckt = false;
+const beobachtet = new WeakSet();
+function editorFenster() {
+  try { return $('#editor').contentDocument?.querySelector('iframe[name=frameEditor]')?.contentWindow || null; } catch { return null; }
+}
+function eingabenBeobachten() {
+  for (const w of [$('#editor').contentWindow, editorFenster()]) {
+    if (!w || beobachtet.has(w)) continue;
+    try {
+      const merken = () => { letzteEingabe = Date.now(); };
+      for (const art of ['keydown', 'keyup', 'input', 'compositionstart', 'compositionupdate', 'wheel', 'paste', 'cut', 'drop'])
+        w.addEventListener(art, merken, true);
+      w.addEventListener('pointerdown', () => { tasteGedrueckt = true; merken(); }, true);
+      w.addEventListener('pointermove', (e) => { if (e.buttons) merken(); }, true);
+      for (const art of ['pointerup', 'pointercancel', 'blur']) w.addEventListener(art, () => { tasteGedrueckt = false; merken(); }, true);
+      beobachtet.add(w);
+    } catch { /* Rahmen noch nicht bereit */ }
+  }
+}
+setInterval(() => { if (aktuell) eingabenBeobachten(); }, 1000);
+function inArbeit() {
+  if (tasteGedrueckt || Date.now() - letzteEingabe < RUHE) return true;
+  try {
+    const api = editorFenster()?.Asc?.editor || editorFenster()?.editor;
+    if (api?.asc_getCellEditMode?.()) return true;      // Zelle wird gerade bearbeitet
+    if (api?.isLongAction?.()) return true;             // Editor rechnet/lädt noch
+  } catch { /* Editor nicht erreichbar: dann zählt nur die Ruhezeit */ }
+  return false;
+}
 function planeSpeichern() {
   clearTimeout(speicherTimer);
-  speicherTimer = setTimeout(speichern, 2500);
+  speicherTimer = setTimeout(function versuch() {
+    if (inArbeit()) { speicherTimer = setTimeout(versuch, 1000); return; }
+    speichern();
+  }, 2500);
 }
+// Verlässt man das Fenster (anderes Programm, Tab, minimiert), sofort sichern
+document.addEventListener('visibilitychange', () => { if (document.hidden && ungespeichert && aktuell) speichern(); });
 
 async function speichern() {
   if (!aktuell || aktuell.art === 'pdf') return;
@@ -194,6 +233,7 @@ async function speichern() {
     await Speicher.sichern({ ...vorher, name: aktuell.name, datei: p.file });
     const inDatei = await inOriginalSchreiben(await Speicher.holen(aktuell.id), false).catch(() => false);
     status(p.dirty ? 'Nicht gespeichert' : inDatei ? 'In Datei gespeichert' : 'Gespeichert');
+    ungespeichert = !!p.dirty;
     if (p.dirty) planeSpeichern();
   } catch (err) {
     status('Speichern fehlgeschlagen');
@@ -234,6 +274,7 @@ async function schliessen() {
   $('#bearbeiten').hidden = true; $('#start').hidden = false;
   document.title = NUR_ART ? ARTEN[NUR_ART].name : 'KXD Office A';
   liste();
+  Abgleich.abgleichen();   // zurückgestellte Änderungen anderer Geräte jetzt holen
 }
 
 async function herunterladen(ext) {
@@ -293,6 +334,8 @@ function wolkeZeigen(z) {
 }
 addEventListener('kxd-abgleich', (e) => wolkeZeigen(e.detail));
 addEventListener('kxd-liste', () => { if (!aktuell) liste(); });
+// Der Abgleich fasst das gerade offene Dokument nie an; Änderungen daran von anderen Geräten warten bis zum Schließen.
+window.KXD_OFFEN = () => aktuell?.id;
 addEventListener('kxd-fern', (e) => {
   if (aktuell?.id === e.detail.id) meldung('Dieses Dokument wurde auf einem anderen Gerät geändert. Zur Übersicht und neu öffnen, um die neue Fassung zu sehen.', 8000);
 });

@@ -3,7 +3,7 @@
 // Editor-Dateien (sdkjs, web-apps, fonts) liegen in einem Zwischenspeicher, der nur bei neuem Editor-Kern
 // wechselt; alles andere in einem, der bei jeder Veroeffentlichung wechselt. Beide Namen setzt office-a-paket.py.
 const KERN = 'kxd-office-kern-e975654';
-const APP = 'kxd-office-app-20261101133102';
+const APP = 'kxd-office-app-20261103205120';
 const BASIS = new URL('./', self.location.href).pathname;          // z. B. /office/
 const GRUNDAUSSTATTUNG = ['./', 'index.html', 'editor.html', 'manifest.json', 'kxd/app.js', 'kxd/app.css',
   'kxd/speicher.js', 'kxd/abgleich.js', 'kxd/vendor/supabase.min.js', 'kxd/icon.svg', 'kxd/icon-192.png',
@@ -11,12 +11,13 @@ const GRUNDAUSSTATTUNG = ['./', 'index.html', 'editor.html', 'manifest.json', 'k
 
 self.addEventListener('install', (e) => {
   // cache: 'reload' – am Browser-Zwischenspeicher vorbei, sonst landet eine veraltete Fassung im Offline-Speicher
-  e.waitUntil(caches.open(APP).then((c) => c.addAll(GRUNDAUSSTATTUNG.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  // Kein skipWaiting/clients.claim: Eine neue Fassung übernimmt erst, wenn alle KXD-Fenster zu sind.
+  // Sonst würde der Editor mitten in der Arbeit neu laden (laufende Eingaben und Rückgängig weg).
+  e.waitUntil(caches.open(APP).then((c) => c.addAll(GRUNDAUSSTATTUNG.map((u) => new Request(u, { cache: 'reload' })))));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((namen) => Promise.all(namen.filter((n) => n.startsWith('kxd-office-') && n !== KERN && n !== APP).map((n) => caches.delete(n))))
-    .then(() => self.clients.claim()));
+    .then((namen) => Promise.all(namen.filter((n) => n.startsWith('kxd-office-') && n !== KERN && n !== APP).map((n) => caches.delete(n)))));
 });
 
 const istKern = (pfad) => /^(sdkjs|web-apps|fonts)\//.test(pfad);

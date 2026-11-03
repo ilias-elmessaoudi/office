@@ -75,18 +75,24 @@ const Abgleich = (() => {
   async function herunterladen() {
     const stand = (await Speicher.meta('stand')) || '1970-01-01T00:00:00Z';
     let neuerStand = stand, etwasNeu = false;
+    // Stand, bis zu dem sicher alles übernommen ist. Eine Änderung am gerade OFFENEN Dokument wird nie
+    // eingespielt (sonst gingen laufende Eingaben und Rückgängig verloren) – sie wartet, bis es zu ist,
+    // und wird darum bei jedem Abgleich erneut gelesen.
+    let halten = null;
+    const offen = window.KXD_OFFEN?.() || null;
     for (;;) {
       const { data, error } = await client.from(TABELLE).select('*').eq('art', ART).gt('server_zeit', neuerStand).order('server_zeit').limit(200);
       if (error) throw new Error('Herunterladen: ' + error.message);
       for (const z of data) {
+        const vorher = neuerStand;
         neuerStand = z.server_zeit;
         const lokal = await Speicher.holen(z.id);
-        if (lokal && lokal.geaendert > z.geaendert) continue;            // eigene, neuere Aenderung behalten
+        if (lokal && lokal.geaendert >= z.geaendert) continue;           // eigenes Echo oder eigene, neuere Änderung
+        if (z.id === offen) { halten ??= vorher; continue; }             // offenes Dokument: später
         if (z.geloescht) {
           if (lokal) { await Speicher.entfernen(z.id); etwasNeu = true; }
           continue;
         }
-        if (lokal && lokal.geaendert === z.geaendert) continue;          // schon aktuell
         const { data: blob, error: e2 } = await client.storage.from(EIMER).download(pfad(z.id));
         if (e2) throw new Error('Datei laden: ' + e2.message);
         // Griff auf eine lokale Originaldatei (Öffnen mit) bleibt erhalten
@@ -96,7 +102,8 @@ const Abgleich = (() => {
       }
       if (data.length < 200) break;
     }
-    if (neuerStand !== stand) await Speicher.metaSetzen('stand', neuerStand);
+    const sicher = halten ?? neuerStand;
+    if (sicher !== stand) await Speicher.metaSetzen('stand', sicher);
     if (etwasNeu) dispatchEvent(new Event('kxd-liste'));
   }
 
